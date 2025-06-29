@@ -10,6 +10,7 @@ const Navbar = () => {
     { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
     { path: '/products', icon: 'inventory_2', label: 'Products' },
     { path: '/reports', icon: 'analytics', label: 'Reports' },
+    { path: '/SalesScreen', icon: 'analytics', label: 'SalesScreen' },
     
   ];
 
