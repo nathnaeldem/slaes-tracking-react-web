@@ -9,6 +9,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProductsPage  = lazy(() => import('./pages/ProductsPage'));
 const ReportsPage   = lazy(() => import('./pages/ReportsPage'));
 const UsersPage     = lazy(() => import('./pages/UsersPage'));
+const SalesScreen    = lazy(() => import('./pages/SalesScreen'));
 
 function LoadingScreen() {
   return (
@@ -50,6 +51,7 @@ function AppRoutes() {
         <Route path="products"  element={<ProductsPage />} />
         <Route path="reports"   element={<ReportsPage />} />
         <Route path="users"     element={<UsersPage />} />
+        <Route path="sales"     element={<SalesScreen />} />
       </Route>
 
       {/* Fallback */}
