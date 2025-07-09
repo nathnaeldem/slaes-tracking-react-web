@@ -1,0 +1,11 @@
+/* Hide the arrows on number inputs in Webkit-based browsers (Chrome, Safari, Edge) */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Hide the arrows on number inputs in Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
