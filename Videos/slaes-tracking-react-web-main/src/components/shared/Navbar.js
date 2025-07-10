@@ -11,6 +11,9 @@ const Navbar = () => {
     { path: '/products', icon: 'inventory_2', label: 'Products' },
     { path: '/reports', icon: 'analytics', label: 'Reports' },
     { path: '/SalesPage', icon: 'sell', label: 'Sales Page' },
+    { path: '/record-spending', icon: 'payments', label: 'Record Spending' },
+    { path: '/bank-deposit', icon: 'account_balance', label: 'Bank Deposit' },
+    { path: '/transactions', icon: 'receipt_long', label: 'Transactions' },
     
   ];
 

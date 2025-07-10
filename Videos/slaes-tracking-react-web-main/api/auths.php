@@ -1420,7 +1420,7 @@ case 'get_carwash_spendings':
              cs.amount,
              cs.category,
              cs.reason,
-             cs.transaction_date, cs.payment_method, cs.bank_name
+             cs.transaction_date
         FROM car_spendings cs
         JOIN workers w ON cs.user_id = w.id
        WHERE cs.organization_id = :org
@@ -1437,16 +1437,29 @@ case 'get_carwash_spendings':
     break;
 
 case 'get_unpaid_transactions':
-    $stmt = $pdo->prepare("SELECT * FROM product_transactions WHERE unpaid_amount > 0 AND organization_id = :org_id");
+    $stmt = $pdo->prepare("SELECT id, customer_name, unpaid_amount, transaction_date FROM transactions WHERE unpaid_amount > 0 AND organization_id = :org_id ORDER BY transaction_date DESC");
     $stmt->execute([':org_id' => $organizationId]);
-    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode(['success' => true, 'transactions' => $transactions]);
     break;
 
 case 'pay_unpaid_amount':
     $data = $input;
-    $stmt = $pdo->prepare("UPDATE product_transactions SET unpaid_amount = unpaid_amount - :amount WHERE id = :id");
-    $stmt->execute([':amount' => $data['amount'], ':id' => $data['transaction_id']]);
-    echo json_encode(['success' => true]);
+    if (empty($data['transaction_id']) || !isset($data['amount'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Transaction ID and amount are required.']);
+        break;
+    }
+
+    $stmt = $pdo->prepare("UPDATE transactions SET unpaid_amount = unpaid_amount - :amount WHERE id = :id AND organization_id = :org_id");
+    $stmt->execute([':amount' => $data['amount'], ':id' => $data['transaction_id'], ':org_id' => $organizationId]);
+
+    if ($stmt->rowCount() > 0) {
+        echo json_encode(['success' => true, 'message' => 'Payment successful.']);
+    } else {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Transaction not found or no update made.']);
+    }
     break;
 
     // … previous cases …

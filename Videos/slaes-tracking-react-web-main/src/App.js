@@ -10,6 +10,9 @@ const ProductsPage  = lazy(() => import('./pages/ProductsPage'));
 const ReportsPage   = lazy(() => import('./pages/ReportsPage'));
 const UsersPage     = lazy(() => import('./pages/UsersPage'));
 const SalesPage     = lazy(() => import('./pages/SalesPage'));
+const RecordSpendingPage = lazy(() => import('./pages/RecordSpendingPage'));
+const BankDepositPage = lazy(() => import('./pages/BankDepositPage'));
+const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 
 function LoadingScreen() {
   return (
@@ -51,7 +54,10 @@ function AppRoutes() {
         <Route path="products"  element={<ProductsPage />} />
         <Route path="reports"   element={<ReportsPage />} />
         <Route path="users"     element={<UsersPage />} />
-        <Route path='SalesPage' element={<SalesPage />} />     
+        <Route path='SalesPage' element={<SalesPage />} />
+        <Route path="record-spending" element={<RecordSpendingPage />} />
+        <Route path="bank-deposit" element={<BankDepositPage />} />
+        <Route path="transactions" element={<TransactionsPage />} />     
       </Route>
 
       {/* Fallback */}

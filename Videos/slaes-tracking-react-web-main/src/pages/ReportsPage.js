@@ -17,6 +17,7 @@ const ReportsPage = () => {
   const [reportData, setReportData] = useState(null);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
+  const [bankDeposits, setBankDeposits] = useState([]);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -32,6 +33,7 @@ const ReportsPage = () => {
 
       if (response.data.success) {
         setReportData(response.data);
+        setBankDeposits(response.data.bank_deposits || []);
       } else {
         throw new Error(response.data.message || 'Failed to fetch report');
       }
@@ -328,6 +330,40 @@ const ReportsPage = () => {
               </table>
             </div>
           </div>
+          
+          {/* Bank Deposits */}
+          {bankDeposits && bankDeposits.length > 0 && (
+            <div className="card">
+              <div className="card-header">
+                <h3>Bank Deposits</h3>
+                <span className="count-badge">{bankDeposits.length} records</span>
+              </div>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Bank Name</th>
+                      <th>Amount</th>
+                      <th>Reference #</th>
+                      <th>Comment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bankDeposits.map((deposit, index) => (
+                      <tr key={index}>
+                        <td>{new Date(deposit.deposit_date).toLocaleDateString()}</td>
+                        <td>{deposit.bank_name}</td>
+                        <td>{formatCurrency(deposit.amount)}</td>
+                        <td>{deposit.reference_number}</td>
+                        <td>{deposit.comment}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
