@@ -13,6 +13,8 @@ const SalesPage     = lazy(() => import('./pages/SalesPage'));
 const RecordSpendingPage = lazy(() => import('./pages/RecordSpendingPage'));
 const BankDepositPage = lazy(() => import('./pages/BankDepositPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
+const CreditRegisterPage = lazy(() => import('./pages/CreditRegisterPage'));
+const NewTransactionsPage = lazy(() => import('./pages/NewTransactionsPage'));
 
 function LoadingScreen() {
   return (
@@ -57,7 +59,9 @@ function AppRoutes() {
         <Route path='SalesPage' element={<SalesPage />} />
         <Route path="record-spending" element={<RecordSpendingPage />} />
         <Route path="bank-deposit" element={<BankDepositPage />} />
-        <Route path="transactions" element={<TransactionsPage />} />     
+        <Route path="transactions" element={<TransactionsPage />} />
+        <Route path='credit-register' element={<CreditRegisterPage />} />
+        <Route path='new-transactions' element={<NewTransactionsPage />} />
       </Route>
 
       {/* Fallback */}

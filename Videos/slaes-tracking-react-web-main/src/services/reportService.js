@@ -30,3 +30,14 @@ export const getProductPerformance = () =>
 
 export const getCommissionReport = () => 
   api.get('?action=get_commission_report');
+
+export const getUnpaidTransactions = () => {
+  return api.get('?action=get_unpaid_transactions');
+};
+
+export const payUnpaidAmount = (transactionId, amount) => {
+  return api.post('?action=pay_unpaid_amount', {
+    transaction_id: transactionId,
+    amount: amount,
+  });
+};

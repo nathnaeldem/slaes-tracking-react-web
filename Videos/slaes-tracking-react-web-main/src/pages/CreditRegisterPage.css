@@ -1,0 +1,140 @@
+.credit-register-page {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    font-family: sans-serif;
+}
+
+.main-content {
+    display: flex;
+    gap: 20px;
+}
+
+.product-list-section {
+    flex: 3;
+}
+
+.cart-section {
+    flex: 2;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+}
+
+.filters {
+    margin-bottom: 15px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+}
+
+.category-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.category-tabs button {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.category-tabs button.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.product-card {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.cart-items {
+    margin-bottom: 15px;
+}
+
+.cart-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.cart-item input {
+    width: 50px;
+}
+
+.cart-total {
+    text-align: right;
+    font-size: 1.2em;
+    margin-bottom: 15px;
+}
+
+.checkout-form .customer-input,
+.checkout-form textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+}
+
+.checkout-form button {
+    width: 100%;
+    padding: 10px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.checkout-form button:disabled {
+    background-color: #ccc;
+}
+
+.daily-sales-section {
+    margin-top: 30px;
+}
+
+.toggle-sales-btn {
+    padding: 10px 15px;
+    margin-bottom: 15px;
+}
+
+.sales-list {
+    border-top: 1px solid #ccc;
+    padding-top: 15px;
+}
+
+.sale-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.delete-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.loading-indicator, .network-error {
+    text-align: center;
+    padding: 50px;
+    font-size: 1.5em;
+}

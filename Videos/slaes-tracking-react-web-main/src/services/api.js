@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = '/auths.php';
+const API_BASE = 'https://dankula.x10.mx/auths.php';
 
 const api = axios.create({
   baseURL: API_BASE,

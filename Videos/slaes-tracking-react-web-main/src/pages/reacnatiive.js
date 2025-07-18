@@ -21,15 +21,12 @@ const API_URL = 'https://dankula.x10.mx/auth.php';
 const windowWidth = Dimensions.get('window').width;
 const bankOptions = ['CBE', 'Awash', 'Dashen', 'Abyssinia', 'Birhan', 'Telebirr', 'Check'];
 
-const SalesScreen = () => {
+const CreditRegister = () => {
   // State variables
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [comment, setComment] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [selectedBank, setSelectedBank] = useState('');
-  const [cashAmount, setCashAmount] = useState('');
-  const [bankAmount, setBankAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('credit');
   const [customer, setCustomer] = useState('');
   const [unpaidAmount, setUnpaidAmount] = useState('');
   const [loading, setLoading] = useState(true);
@@ -38,8 +35,6 @@ const SalesScreen = () => {
   const [processing, setProcessing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [categories, setCategories] = useState([]);
-  const [secondaryPaymentMethod, setSecondaryPaymentMethod] = useState('cash');
-  const [secondarySelectedBank, setSecondarySelectedBank] = useState('');
   const [dailySales, setDailySales] = useState([]);
   const [showDailySales, setShowDailySales] = useState(false);
 
@@ -88,7 +83,7 @@ const SalesScreen = () => {
         API_URL,
         {},
         {
-          params: { action: 'get_daily_sales' },
+          params: { action: 'get_daily_sales2' },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -166,15 +161,6 @@ const SalesScreen = () => {
       return;
     }
 
-    // Validate partial payment: if bank amount is provided, bank must be selected
-    if (paymentMethod === 'partial') {
-      const bankAmt = parseFloat(bankAmount || 0);
-      if (bankAmt > 0 && !selectedBank) {
-        Alert.alert('Error', 'Please select a bank for the bank transfer portion');
-        return;
-      }
-    }
-
     setProcessing(true);
     
     try {
@@ -187,65 +173,34 @@ const SalesScreen = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log("Payment data being sent:", {
-        paymentMethod,
-        cashAmount: typeof cashAmount,
-        bankAmount: typeof bankAmount,
-        values: { cashAmount, bankAmount }
-      });
-
-      console.log('Sending payment data:', {
-        paymentMethod,
-        cashAmount,
-        bankAmount,
-        selectedBank,
-        customerName: customer,
-        unpaidAmount,
-        comment,
-        products: cart.map(item => ({
+      const saleData = {
+        cart: JSON.stringify(cart.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity,
-          price: item.price
-        }))
-      });
+          price: item.price,
+          discount: item.discount || 0,
+        }))),
+        comment,
+        payment_method: 'credit',
+        customer_name: customer,
+        unpaid_amount: parseFloat(unpaidAmount) || 0,
+        action: 'checkout2',
+      };
 
+      console.log('Sending sale data:', saleData);
       const response = await axios.post(
         API_URL,
-        {
-          action: 'checkout',
-          cart: JSON.stringify(cart),
-          payment_method: paymentMethod,
-          bank_name: paymentMethod === 'bank' || (paymentMethod === 'partial' && parseFloat(bankAmount) > 0) ? selectedBank : 
-                    (paymentMethod === 'credit' && secondaryPaymentMethod === 'bank') ? secondarySelectedBank : '',
-          cash_amount: paymentMethod === 'partial' ? cashAmount : null,
-          bank_amount: paymentMethod === 'partial' ? bankAmount : null,
-          customer_name: customer,
-          unpaid_amount: unpaidAmount,
-          secondary_payment_method: paymentMethod === 'credit' ? secondaryPaymentMethod : null,
-          comment: comment
-        },
+        saleData,
         { headers: headers }
       );
-
-      console.log("Backend response:", {
-        cash_amount: response.data.cash_amount,
-        bank_amount: response.data.bank_amount,
-        input_cash: response.data.input_cash,
-        input_bank: response.data.input_bank
-      });
+      console.log('Backend response:', response.data);
 
       if (response.data.success) {
         Alert.alert('Success', 'Checkout completed successfully');
         setCart([]);
         setComment('');
-        setPaymentMethod('cash');
-        setSelectedBank('');
-        setCashAmount('');
-        setBankAmount('');
         setCustomer('');
         setUnpaidAmount('');
-        setSecondaryPaymentMethod('cash');
-        setSecondarySelectedBank('');
         fetchProducts();
       } else {
         Alert.alert('Error', response.data.message || 'Checkout failed');
@@ -340,141 +295,6 @@ const SalesScreen = () => {
     
     return filtered;
   };
-
-  const renderPaymentMethod = () => (
-    <View style={{marginBottom: 20, gap: 10}}>
-      <Text style={styles.sectionTitle}>Payment Method</Text>
-      <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 10}}>
-        <TouchableOpacity 
-          style={[styles.paymentMethodButton, paymentMethod === 'cash' && styles.selectedPaymentMethod]}
-          onPress={() => setPaymentMethod('cash')}
-        >
-          <Text style={[styles.paymentMethodText, paymentMethod === 'cash' && styles.selectedPaymentMethodText]}>Cash</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.paymentMethodButton, paymentMethod === 'bank' && styles.selectedPaymentMethod]}
-          onPress={() => setPaymentMethod('bank')}
-        >
-          <Text style={[styles.paymentMethodText, paymentMethod === 'bank' && styles.selectedPaymentMethodText]}>Bank</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.paymentMethodButton, paymentMethod === 'credit' && styles.selectedPaymentMethod]}
-          onPress={() => setPaymentMethod('credit')}
-        >
-          <Text style={[styles.paymentMethodText, paymentMethod === 'credit' && styles.selectedPaymentMethodText]}>Credit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.paymentMethodButton, paymentMethod === 'partial' && styles.selectedPaymentMethod]}
-          onPress={() => setPaymentMethod('partial')}
-        >
-          <Text style={[styles.paymentMethodText, paymentMethod === 'partial' && styles.selectedPaymentMethodText]}>Partial</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {(paymentMethod === 'bank' || paymentMethod === 'partial') && (
-        <View style={styles.bankScrollContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {bankOptions.map(bank => (
-              <TouchableOpacity
-                key={bank}
-                style={[styles.bankOption, selectedBank === bank && styles.selectedBankOption]}
-                onPress={() => setSelectedBank(bank)}
-              >
-                <Text style={[styles.bankOptionText, selectedBank === bank && styles.selectedBankOptionText]}>{bank}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-      {paymentMethod === 'partial' && (
-        <View>
-          <TextInput
-            style={styles.input}
-            placeholder="Cash Amount"
-            placeholderTextColor="#999"
-            value={cashAmount}
-            onChangeText={setCashAmount}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Bank Amount"
-            placeholderTextColor="#999"
-            value={bankAmount}
-            onChangeText={setBankAmount}
-            keyboardType="numeric"
-          />
-        </View>
-      )}
-     
-      
-      {paymentMethod === 'credit' && (
-        <View style={styles.creditContainer}>
-          <Text style={styles.creditTitle}>Credit Payment Details</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Customer Name"
-            placeholderTextColor="#999"
-            value={customer}
-            onChangeText={setCustomer}
-          />
-          <TextInput
-            style={[styles.input, {marginTop: 10}]}
-            placeholder="Unpaid Amount"
-            placeholderTextColor="#999"
-            value={unpaidAmount}
-            onChangeText={setUnpaidAmount}
-            keyboardType="numeric"
-          />
-          
-          {parseFloat(unpaidAmount || 0) > 0 && (
-            <View style={styles.paidAmountSection}>
-              <Text style={styles.paidAmountTitle}>Payment for Paid Amount</Text>
-              <Text style={styles.sectionSubtitle}>Select payment method for the paid portion</Text>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 10}}>
-                <TouchableOpacity 
-                  style={[styles.paymentMethodButton, secondaryPaymentMethod === 'cash' && styles.selectedPaymentMethod]}
-                  onPress={() => setSecondaryPaymentMethod('cash')}
-                >
-                  <Text style={[styles.paymentMethodText, secondaryPaymentMethod === 'cash' && styles.selectedPaymentMethodText]}>Cash</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.paymentMethodButton, secondaryPaymentMethod === 'bank' && styles.selectedPaymentMethod]}
-                  onPress={() => setSecondaryPaymentMethod('bank')}
-                >
-                  <Text style={[styles.paymentMethodText, secondaryPaymentMethod === 'bank' && styles.selectedPaymentMethodText]}>Bank</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {secondaryPaymentMethod === 'bank' && (
-                <View style={{marginTop: 10}}>
-                  <Text style={styles.sectionSubtitle}>Select Bank for Paid Amount</Text>
-                  <ScrollView 
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.bankScrollContainer}
-                  >
-                    {bankOptions.map(bank => (
-                      <TouchableOpacity
-                        key={bank}
-                        style={[
-                          styles.bankOption,
-                          secondarySelectedBank === bank && styles.selectedBankOption
-                        ]}
-                        onPress={() => setSecondarySelectedBank(bank)}
-                      >
-                        <Text style={styles.bankOptionText}>{bank}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-      )}
-    </View>
-  );
 
   const deleteSale = async (saleId) => {
     try {
@@ -619,8 +439,23 @@ const SalesScreen = () => {
           )}
         </View>
 
-        {/* Payment Method */}
-        {renderPaymentMethod()}
+        {/* Customer and Unpaid Amount Inputs */}
+        <View style={styles.creditContainer}>
+          <Text style={styles.creditTitle}>Customer Information</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Customer Name"
+            value={customer}
+            onChangeText={setCustomer}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Unpaid Amount"
+            keyboardType="numeric"
+            value={unpaidAmount}
+            onChangeText={setUnpaidAmount}
+          />
+        </View>
 
         {/* Products Section */}
         <View style={styles.productsSection}>
@@ -944,94 +779,6 @@ const styles = StyleSheet.create({
   selectedCategoryButtonText: {
     color: '#fff',
   },
-  paymentMethodButton: {
-    backgroundColor: '#f8f9fa',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 100,
-    height: 40,
-  },
-  selectedPaymentMethod: {
-    backgroundColor: '#4A90E2',
-  },
-  paymentMethodText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    includeFontPadding: false,
-    textTransform: 'capitalize',
-  },
-  selectedPaymentMethodText: {
-    color: '#fff',
-  },
-  input: {
-    height: 40,
-    fontSize: 16,
-    padding: 10,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  bankScrollContainer: {
-    paddingHorizontal: 15,
-    paddingBottom: 5,
-  },
-  bankOption: {
-    backgroundColor: '#f8f9fa',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 40,
-    minWidth: 90,
-  },
-  selectedBankOption: {
-    backgroundColor: '#4A90E2',
-  },
-  bankOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  selectedBankOptionText: {
-    color: '#fff',
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#777',
-    marginBottom: 8,
-  },
-  // New styles for credit section
-  creditContainer: {
-    backgroundColor: '#f0f7ff',
-    borderRadius: 12,
-    padding: 15,
-    marginTop: 15,
-  },
-  creditTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 10,
-  },
-  paidAmountSection: {
-    backgroundColor: '#e6f2ff',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 10,
-  },
-  paidAmountTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#4A90E2',
-    marginBottom: 5,
-  },
   toggleButton: {
     backgroundColor: '#4A90E2',
     padding: 15,
@@ -1061,13 +808,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
   salesItemText: {
     fontSize: 14,
-    flex: 1,
-    flexWrap: 'wrap',
-    marginRight: 10,
   },
   deleteButton: {
     backgroundColor: '#e74c3c',
@@ -1082,6 +825,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  creditContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  creditTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  input: {
+    height: 40,
+    fontSize: 16,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
 });
 
-export default SalesScreen;
+export default CreditRegister;

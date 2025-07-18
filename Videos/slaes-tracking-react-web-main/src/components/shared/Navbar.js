@@ -14,6 +14,8 @@ const Navbar = () => {
     { path: '/record-spending', icon: 'payments', label: 'Record Spending' },
     { path: '/bank-deposit', icon: 'account_balance', label: 'Bank Deposit' },
     { path: '/transactions', icon: 'receipt_long', label: 'Transactions' },
+    { path: '/credit-register', icon: 'credit_card', label: 'Credit Register' },
+  { path: '/new-transactions', icon: 'receipt_long', label: 'New Transactions' },
     
   ];
 
