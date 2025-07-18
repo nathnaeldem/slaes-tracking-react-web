@@ -25,6 +25,8 @@ const SalesPage = () => {
   const [secondarySelectedBank, setSecondarySelectedBank] = useState('');
   const [dailySales, setDailySales] = useState([]);
   const [showDailySales, setShowDailySales] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [bankAmount, setBankAmount] = useState('');
 
   const fetchProducts = async () => {
     try {
@@ -115,6 +117,31 @@ const SalesPage = () => {
     ).toFixed(2);
   };
 
+  const deleteSale = async (saleId) => {
+    try {
+      const response = await api.post('', 
+        { sale_id: saleId },
+        { params: { action: 'delete_sale' } }
+      );
+
+      if (response.data.success) {
+        alert('Sale deleted successfully');
+        fetchDailySales(); // Refresh the list
+      } else {
+        alert(response.data.message || 'Failed to delete sale');
+      }
+    } catch (error) {
+      console.error('Delete sale error:', error);
+      alert(error.response?.data?.message || 'An error occurred while deleting the sale.');
+    }
+  };
+
+  const confirmDelete = (saleId) => {
+    if (window.confirm('Are you sure you want to delete this sale?')) {
+      deleteSale(saleId);
+    }
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) {
       alert('Your cart is empty');
@@ -129,12 +156,52 @@ const SalesPage = () => {
     setProcessing(true);
     
     try {
+      let paymentData = {};
+      
+      if (paymentMethod === 'partial') {
+        const bankAmt = parseFloat(bankAmount || 0);
+        const cashAmt = parseFloat(cashAmount || 0);
+        const totalPaid = bankAmt + cashAmt;
+        const totalCart = parseFloat(calculateTotal());
+
+        if (totalPaid > totalCart) {
+          alert('The paid amount cannot be greater than the total amount.');
+          return;
+        }
+
+        if (bankAmt > 0 && !selectedBank) {
+          alert('Please select a bank for the bank transfer portion');
+          return;
+        }
+      }
+
+      if (paymentMethod === 'credit') {
+        paymentData = {
+          payment_method: 'credit',
+          customer_name: customer,
+          unpaid_amount: unpaidAmount,
+          secondary_payment_method: secondaryPaymentMethod,
+          bank_name: secondaryPaymentMethod === 'bank' ? secondarySelectedBank : '',
+          comment: comment,
+          cart: JSON.stringify(cart)
+        };
+      } else if (paymentMethod === 'partial') {
+        paymentData = {
+          payment_method: 'partial',
+          cash_amount: cashAmount,
+          bank_amount: bankAmount,
+          bank_name: selectedBank,
+        };
+      } else {
+        paymentData = {
+          payment_method: 'cash',
+        };
+      }
+
       const response = await api.post('', {
         action: 'checkout',
         cart: JSON.stringify(cart),
-        payment_method: paymentMethod,
-        bank_name: paymentMethod === 'bank' ? selectedBank : 
-                  (paymentMethod === 'credit' && secondaryPaymentMethod === 'bank') ? secondarySelectedBank : '',
+        ...paymentData,
         customer_name: customer,
         unpaid_amount: unpaidAmount,
         secondary_payment_method: paymentMethod === 'credit' ? secondaryPaymentMethod : null,
@@ -151,6 +218,8 @@ const SalesPage = () => {
         setUnpaidAmount('');
         setSecondaryPaymentMethod('cash');
         setSecondarySelectedBank('');
+        setCashAmount('');
+        setBankAmount('');
         fetchProducts();
       } else {
         alert(response.data.message || 'Checkout failed');
@@ -186,33 +255,30 @@ const SalesPage = () => {
       <div className="sales-header">
         <h2>Sales</h2>
         <button 
-          className="toggle-button"
+          className="toggle-sales-button"
           onClick={() => setShowDailySales(!showDailySales)}
         >
-          {showDailySales ? 'Hide Daily Sales' : 'Show Daily Sales'}
+          {showDailySales ? 'Hide' : 'Show'} Daily Sales
         </button>
       </div>
 
       {showDailySales && (
-        <div className="daily-sales-card">
+        <div className="daily-sales-container">
           <h3>Today's Sales</h3>
           {dailySales.length > 0 ? (
-            <div className="sales-list">
-              {dailySales.map((item) => (
-                <div key={item.transaction_item_id} className="sales-item">
-                  <div className="sales-item-info">
-                    <span className="sales-item-name">{item.product_name}</span>
-                    <div className="sales-item-details">
-                      <span>Qty: {item.quantity}</span>
-                      <span>Price: {item.price} ETB</span>
-                      <span>Total: {item.total_amount} ETB</span>
-                    </div>
-                  </div>
-                </div>
+            <ul className="sales-list">
+              {dailySales.map(sale => (
+                <li key={sale.transaction_item_id} className="sales-item">
+                  <span className="sales-item-name">{sale.product_name}</span>
+                  <span>Qty: {sale.quantity}</span>
+                  <span>Price: {sale.price}</span>
+                  <span>Total: {sale.total_amount}</span>
+                  <button className="delete-sale-button" onClick={() => confirmDelete(sale.transaction_item_id)}>Delete</button>
+                </li>
               ))}
-            </div>
+            </ul>
           ) : (
-            <p className="no-sales">No sales recorded for today.</p>
+            <p>No sales recorded for today.</p>
           )}
         </div>
       )}
@@ -336,8 +402,14 @@ const SalesPage = () => {
             >
               <FaCreditCard /> Credit
             </button>
+            <button
+              className={`payment-button ${paymentMethod === 'partial' ? 'active' : ''}`}
+              onClick={() => setPaymentMethod('partial')}
+            >
+              Partial
+            </button>
           </div>
-          
+
           {paymentMethod === 'bank' && (
             <div className="bank-section">
               <h4>Select Bank</h4>
@@ -354,7 +426,45 @@ const SalesPage = () => {
               </div>
             </div>
           )}
-          
+
+          {paymentMethod === 'partial' && (
+            <div className="partial-section">
+              <h4>Partial Payment</h4>
+              <input
+                type="number"
+                placeholder="Cash Amount"
+                value={cashAmount}
+                onChange={(e) => setCashAmount(e.target.value)}
+                min="0"
+                step="0.01"
+              />
+              <input
+                type="number"
+                placeholder="Bank Amount"
+                value={bankAmount}
+                onChange={(e) => setBankAmount(e.target.value)}
+                min="0"
+                step="0.01"
+              />
+              {parseFloat(bankAmount || 0) > 0 && (
+                <div className="bank-section">
+                  <h5>Select Bank for Bank Amount</h5>
+                  <div className="bank-options">
+                    {bankOptions.map(bank => (
+                      <button
+                        key={bank}
+                        className={`bank-option ${selectedBank === bank ? 'active' : ''}`}
+                        onClick={() => setSelectedBank(bank)}
+                      >
+                        {bank}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {paymentMethod === 'credit' && (
             <div className="credit-section">
               <h4>Credit Payment Details</h4>
@@ -373,9 +483,9 @@ const SalesPage = () => {
                 step="0.01"
               />
               
-              {parseFloat(unpaidAmount || 0) > 0 && (
+              {parseFloat(calculateTotal()) - parseFloat(unpaidAmount || 0) > 0 && (
                 <div className="paid-amount-section">
-                  <h5>Payment for Paid Amount</h5>
+                  <h5>Payment for Paid Amount ({(parseFloat(calculateTotal()) - parseFloat(unpaidAmount || 0)).toFixed(2)} ETB)</h5>
                   <div className="secondary-payment">
                     <button
                       className={`payment-button ${secondaryPaymentMethod === 'cash' ? 'active' : ''}`}
@@ -407,29 +517,6 @@ const SalesPage = () => {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="products-section">
-          <h3>Available Products</h3>
-          {loading ? (
-            <div className="loading">
-              <div className="spinner"></div>
-              <p>Loading products...</p>
-            </div>
-          ) : networkError ? (
-            <p className="error">Network Error. Please try again.</p>
-          ) : (
-            <div className="product-grid">
-              {getFilteredProducts().map(product => (
-                <div key={product.id} className="product-card">
-                  <div className="product-info">
-                    <h4 className="product-name">{product.name}</h4>
-                    <p className="product-price">{product.selling_price} ETB</p>
-                    <p className="product-stock">Available: {product.quantity}</p>
                   </div>
                   <button 
                     className="add-to-cart"

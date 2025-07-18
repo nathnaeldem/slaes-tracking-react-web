@@ -1,743 +1,1087 @@
-// File: AnalyticsReportScreen.js
 import React, { useState, useEffect } from 'react';
-import {
+import { 
   View, 
-  ScrollView, 
+  Text, 
   StyleSheet, 
+  ScrollView, 
+  FlatList, 
+  TouchableOpacity, 
   ActivityIndicator, 
-  Text,
-  TouchableOpacity,
-  FlatList,
-  Dimensions
+  KeyboardAvoidingView,
+  Platform, 
+  TextInput, 
+  Dimensions, 
+  Alert
 } from 'react-native';
-import { Card, Icon } from 'react-native-elements';
-import { LineChart, PieChart } from 'react-native-chart-kit';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useAuth } from '../context/AuthContext';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'https://dankula.x10.mx/auth.php';
+const windowWidth = Dimensions.get('window').width;
+const bankOptions = ['CBE', 'Awash', 'Dashen', 'Abyssinia', 'Birhan', 'Telebirr', 'Check'];
 
-const analyticsApi = axios.create({ 
-  baseURL: API_URL, 
-  headers: { 'Content-Type': 'application/json' }, 
-  timeout: 15000, 
-});
+const SalesScreen = () => {
+  // State variables
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [comment, setComment] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [selectedBank, setSelectedBank] = useState('');
+  const [cashAmount, setCashAmount] = useState('');
+  const [bankAmount, setBankAmount] = useState('');
+  const [customer, setCustomer] = useState('');
+  const [unpaidAmount, setUnpaidAmount] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [networkError, setNetworkError] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [categories, setCategories] = useState([]);
+  const [secondaryPaymentMethod, setSecondaryPaymentMethod] = useState('cash');
+  const [secondarySelectedBank, setSecondarySelectedBank] = useState('');
+  const [dailySales, setDailySales] = useState([]);
+  const [showDailySales, setShowDailySales] = useState(false);
 
+  // Fetch products from API
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setNetworkError(false);
+      
+      const token = await AsyncStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-const AnalyticsReportScreen = ({ navigation }) => { 
-  const { user } = useAuth(); 
-  const [loading, setLoading] = useState(true); 
-  const [error, setError] = useState(null); 
-  const [reportData, setReportData] = useState(null);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+      const response = await axios.post(
+        API_URL,
+        {},
+        {
+          params: { action: 'getProducts' },
+          headers: headers,
+        }
+      );
 
-  const fetchReport = async () => { 
-    setLoading(true); 
-    setError(null); 
-    try { 
-      const token = await AsyncStorage.getItem('token'); 
-      analyticsApi.defaults.headers.common['Authorization'] = `Bearer ${token}`; 
+      const availableProducts = response.data.products.filter(
+        (product) => product.status === 'in_store' && product.quantity > 0
+      );
+      
+      setProducts(availableProducts);
+    } catch (err) {
+      console.error("Fetch products error:", err);
+      setNetworkError(true);
+      Alert.alert('Error', 'Failed to fetch products. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      console.log(`Fetching report with start_date: ${formatDate(startDate)} and end_date: ${formatDate(endDate)}`);
-      const response = await analyticsApi.post('', {}, {
-        params: { 
-          action: 'getAnalyticsAndReports',
-          start_date: formatDate(startDate),
-          end_date: formatDate(endDate)
-        } 
+  const fetchDailySales = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await axios.post(
+        API_URL,
+        {},
+        {
+          params: { action: 'get_daily_sales' },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.data.success) {
+        setDailySales(response.data.sales);
+      } else {
+        Alert.alert('Error', response.data.message || 'Failed to fetch daily sales.');
+      }
+    } catch (error) {
+      console.error('Fetch daily sales error:', error);
+      const errorMessage = error.response?.data?.message || 'An error occurred while fetching daily sales.';
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    fetchDailySales();
+  }, []);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      const uniqueCategories = ['All', ...new Set(products.map(p => p.category))];
+      setCategories(uniqueCategories);
+    }
+  }, [products]);
+
+  // Cart management functions
+  const addToCart = (product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.product_id === product.id);
+      if (existingItem) {
+        return prevCart.map(item => 
+          item.product_id === product.id 
+            ? {...item, quantity: item.quantity + 1} 
+            : item
+        );
+      }
+      return [...prevCart, {
+        product_id: product.id,
+        name: product.name,
+        quantity: 1,
+        price: product.selling_price,
+        maxQuantity: product.quantity
+      }];
+    });
+  };
+
+  const removeFromCart = (productId) => {
+    setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
+  };
+
+  const updateCartItem = (productId, field, value) => {
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.product_id === productId ? {...item, [field]: value} : item
+      )
+    );
+  };
+
+  const calculateTotal = () => {
+    return cart.reduce((total, item) => 
+      total + (item.quantity * item.price), 0
+    ).toFixed(2);
+  };
+
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      Alert.alert('Error', 'Your cart is empty');
+      return;
+    }
+
+    if (paymentMethod === 'credit' && !customer) {
+      Alert.alert('Error', 'Please enter customer name for credit payment');
+      return;
+    }
+
+    // Validate partial payment: if bank amount is provided, bank must be selected
+    if (paymentMethod === 'partial') {
+      const bankAmt = parseFloat(bankAmount || 0);
+      if (bankAmt > 0 && !selectedBank) {
+        Alert.alert('Error', 'Please select a bank for the bank transfer portion');
+        return;
+      }
+    }
+
+    setProcessing(true);
+    
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      console.log("Payment data being sent:", {
+        paymentMethod,
+        cashAmount: typeof cashAmount,
+        bankAmount: typeof bankAmount,
+        values: { cashAmount, bankAmount }
       });
 
-      console.log('Report data received:', response.data);
+      console.log('Sending payment data:', {
+        paymentMethod,
+        cashAmount,
+        bankAmount,
+        selectedBank,
+        customerName: customer,
+        unpaidAmount,
+        comment,
+        products: cart.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      });
+
+      const response = await axios.post(
+        API_URL,
+        {
+          action: 'checkout',
+          cart: JSON.stringify(cart),
+          payment_method: paymentMethod,
+          bank_name: paymentMethod === 'bank' || (paymentMethod === 'partial' && parseFloat(bankAmount) > 0) ? selectedBank : 
+                    (paymentMethod === 'credit' && secondaryPaymentMethod === 'bank') ? secondarySelectedBank : '',
+          cash_amount: paymentMethod === 'partial' ? cashAmount : null,
+          bank_amount: paymentMethod === 'partial' ? bankAmount : null,
+          customer_name: customer,
+          unpaid_amount: unpaidAmount,
+          secondary_payment_method: paymentMethod === 'credit' ? secondaryPaymentMethod : null,
+          comment: comment
+        },
+        { headers: headers }
+      );
+
+      console.log("Backend response:", {
+        cash_amount: response.data.cash_amount,
+        bank_amount: response.data.bank_amount,
+        input_cash: response.data.input_cash,
+        input_bank: response.data.input_bank
+      });
 
       if (response.data.success) {
-        setReportData(response.data);
+        Alert.alert('Success', 'Checkout completed successfully');
+        setCart([]);
+        setComment('');
+        setPaymentMethod('cash');
+        setSelectedBank('');
+        setCashAmount('');
+        setBankAmount('');
+        setCustomer('');
+        setUnpaidAmount('');
+        setSecondaryPaymentMethod('cash');
+        setSecondarySelectedBank('');
+        fetchProducts();
       } else {
-        throw new Error(response.data.message || 'Failed to fetch report');
+        Alert.alert('Error', response.data.message || 'Checkout failed');
       }
-    } catch (err) { 
-      console.error('Error fetching report:', err); 
-      setError('Failed to load report. Please try again.'); 
-    } finally { 
-      setLoading(false); 
-    } 
-  };
-
-  const formatDate = (date) => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const formatCurrency = (amount) => {
-    return `ETB ${Number(amount).toFixed(2)}`;
-  };
-
-  const handleStartDateChange = (event, selectedDate) => {
-    setShowStartPicker(false);
-    if (selectedDate) {
-      setStartDate(selectedDate);
+    } catch (err) {
+      console.error('Checkout error:', err);
+      Alert.alert('Error', err.response?.data?.message || 'Checkout failed');
+    } finally {
+      setProcessing(false);
     }
   };
 
-  const handleEndDateChange = (event, selectedDate) => {
-    setShowEndPicker(false);
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
-  };
+  const renderProduct = ({ item }) => (
+    <View style={styles.productCard}>
+      <View style={styles.productContent}>
+        <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.productPrice}>{item.selling_price} ETB</Text>
+        <Text style={styles.productStock}>Available: {item.quantity}</Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.addToCartButton}
+        onPress={() => addToCart(item)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.addToCartText}>Add to Cart</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-  useEffect(() => { 
-    fetchReport(); 
-  }, [startDate, endDate]);
-
-  const screenWidth = Dimensions.get('window').width;
-
-  const chartConfig = {
-    backgroundGradientFrom: "#fff",
-    backgroundGradientTo: "#fff",
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-    strokeWidth: 2,
-    barPercentage: 0.5,
-  };
-
-  const renderLineChart = () => {
-    if (!reportData?.daily_summary || reportData.daily_summary.length === 0) {
-      return null;
-    }
-
-    const data = {
-      labels: reportData.daily_summary.map(d => new Date(d.date).getDate()),
-      datasets: [
-        {
-          data: reportData.daily_summary.map(d => Number(d.sales)),
-          color: (opacity = 1) => `rgba(0, 184, 148, ${opacity})`,
-          strokeWidth: 2,
-        },
-        {
-          data: reportData.daily_summary.map(d => Number(d.expenses)),
-          color: (opacity = 1) => `rgba(225, 112, 85, ${opacity})`,
-          strokeWidth: 2,
-        },
-      ],
-      legend: ["Sales", "Expenses"],
-    };
-
-    return (
-      <Card containerStyle={styles.chartCard}>
-        <Card.Title>Sales vs Expenses Trend</Card.Title>
-        <LineChart
-          data={data}
-          width={screenWidth - 40}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
+  const renderCartItem = ({ item }) => (
+    <View style={styles.cartItem}>
+      <View style={styles.cartItemInfo}>
+        <Text style={styles.cartItemName}>{item.name}</Text>
+        <TextInput
+          style={styles.cartItemPrice}
+          value={item.price.toString()}
+          onChangeText={(text) => {
+            const num = parseFloat(text) || 0;
+            updateCartItem(item.product_id, 'price', Math.max(0, num));
+          }}
+          keyboardType="numeric"
         />
-      </Card>
-    );
+      </View>
+      <View style={styles.cartItemControls}>
+        <TouchableOpacity 
+          onPress={() => updateCartItem(item.product_id, 'quantity', Math.max(1, item.quantity - 1))}
+          style={styles.quantityButton}
+        >
+          <Icon name="remove" size={20} color="#4A90E2" />
+        </TouchableOpacity>
+        <TextInput
+          style={styles.quantityInput}
+          value={item.quantity.toString()}
+          onChangeText={(text) => {
+            const num = parseInt(text) || 1;
+            updateCartItem(item.product_id, 'quantity', Math.min(num, item.maxQuantity));
+          }}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity 
+          onPress={() => updateCartItem(item.product_id, 'quantity', Math.min(item.quantity + 1, item.maxQuantity))}
+          style={styles.quantityButton}
+        >
+          <Icon name="add" size={20} color="#4A90E2" />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => removeFromCart(item.product_id)}
+          style={styles.removeButton}
+        >
+          <Icon name="delete" size={20} color="#e74c3c" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const getFilteredProducts = () => {
+    let filtered = [...products];
+    
+    // Apply category filter
+    if (selectedCategory !== 'All') {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+    
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product => 
+        product.name.toLowerCase().includes(query) ||
+        (product.description && product.description.toLowerCase().includes(query))
+      );
+    }
+    
+    return filtered;
   };
 
-  const renderPieChart = (title, chartData, colors) => {
-    if (!chartData || Object.keys(chartData).length === 0) {
-      return null;
-    }
-
-    const data = Object.entries(chartData).map(([name, population], index) => ({
-      name,
-      population: Number(population),
-      color: colors[index % colors.length],
-      legendFontColor: '#7F7F7F',
-      legendFontSize: 15,
-    }));
-
-    return (
-      <Card containerStyle={styles.chartCard}>
-        <Card.Title>{title}</Card.Title>
-        <PieChart
-          data={data}
-          width={screenWidth - 40}
-          height={220}
-          chartConfig={chartConfig}
-          accessor={"population"}
-          backgroundColor={"transparent"}
-          absolute
-          hasLegend={false}
-        />
-        <View style={styles.legendContainer}>
-          {data.map(item => (
-            <View key={item.name} style={styles.legendItem}>
-              <View style={[styles.legendColorBox, { backgroundColor: item.color }]} />
-              <Text style={styles.legendText}>{item.name}: </Text>
-              <Text style={styles.legendValue}>{formatCurrency(item.population)}</Text>
-            </View>
-          ))}
+  const renderPaymentMethod = () => (
+    <View style={{marginBottom: 20, gap: 10}}>
+      <Text style={styles.sectionTitle}>Payment Method</Text>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 10}}>
+        <TouchableOpacity 
+          style={[styles.paymentMethodButton, paymentMethod === 'cash' && styles.selectedPaymentMethod]}
+          onPress={() => setPaymentMethod('cash')}
+        >
+          <Text style={[styles.paymentMethodText, paymentMethod === 'cash' && styles.selectedPaymentMethodText]}>Cash</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.paymentMethodButton, paymentMethod === 'bank' && styles.selectedPaymentMethod]}
+          onPress={() => setPaymentMethod('bank')}
+        >
+          <Text style={[styles.paymentMethodText, paymentMethod === 'bank' && styles.selectedPaymentMethodText]}>Bank</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.paymentMethodButton, paymentMethod === 'credit' && styles.selectedPaymentMethod]}
+          onPress={() => setPaymentMethod('credit')}
+        >
+          <Text style={[styles.paymentMethodText, paymentMethod === 'credit' && styles.selectedPaymentMethodText]}>Credit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.paymentMethodButton, paymentMethod === 'partial' && styles.selectedPaymentMethod]}
+          onPress={() => setPaymentMethod('partial')}
+        >
+          <Text style={[styles.paymentMethodText, paymentMethod === 'partial' && styles.selectedPaymentMethodText]}>Partial</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {(paymentMethod === 'bank' || paymentMethod === 'partial') && (
+        <View style={styles.bankScrollContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {bankOptions.map(bank => (
+              <TouchableOpacity
+                key={bank}
+                style={[styles.bankOption, selectedBank === bank && styles.selectedBankOption]}
+                onPress={() => setSelectedBank(bank)}
+              >
+                <Text style={[styles.bankOptionText, selectedBank === bank && styles.selectedBankOptionText]}>{bank}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      </Card>
+      )}
+      {paymentMethod === 'partial' && (
+        <View>
+          <TextInput
+            style={styles.input}
+            placeholder="Cash Amount"
+            placeholderTextColor="#999"
+            value={cashAmount}
+            onChangeText={setCashAmount}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Bank Amount"
+            placeholderTextColor="#999"
+            value={bankAmount}
+            onChangeText={setBankAmount}
+            keyboardType="numeric"
+          />
+        </View>
+      )}
+     
+      
+      {paymentMethod === 'credit' && (
+        <View style={styles.creditContainer}>
+          <Text style={styles.creditTitle}>Credit Payment Details</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Customer Name"
+            placeholderTextColor="#999"
+            value={customer}
+            onChangeText={setCustomer}
+          />
+          <TextInput
+            style={[styles.input, {marginTop: 10}]}
+            placeholder="Unpaid Amount"
+            placeholderTextColor="#999"
+            value={unpaidAmount}
+            onChangeText={setUnpaidAmount}
+            keyboardType="numeric"
+          />
+          
+          {parseFloat(unpaidAmount || 0) > 0 && (
+            <View style={styles.paidAmountSection}>
+              <Text style={styles.paidAmountTitle}>Payment for Paid Amount</Text>
+              <Text style={styles.sectionSubtitle}>Select payment method for the paid portion</Text>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 10}}>
+                <TouchableOpacity 
+                  style={[styles.paymentMethodButton, secondaryPaymentMethod === 'cash' && styles.selectedPaymentMethod]}
+                  onPress={() => setSecondaryPaymentMethod('cash')}
+                >
+                  <Text style={[styles.paymentMethodText, secondaryPaymentMethod === 'cash' && styles.selectedPaymentMethodText]}>Cash</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.paymentMethodButton, secondaryPaymentMethod === 'bank' && styles.selectedPaymentMethod]}
+                  onPress={() => setSecondaryPaymentMethod('bank')}
+                >
+                  <Text style={[styles.paymentMethodText, secondaryPaymentMethod === 'bank' && styles.selectedPaymentMethodText]}>Bank</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {secondaryPaymentMethod === 'bank' && (
+                <View style={{marginTop: 10}}>
+                  <Text style={styles.sectionSubtitle}>Select Bank for Paid Amount</Text>
+                  <ScrollView 
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.bankScrollContainer}
+                  >
+                    {bankOptions.map(bank => (
+                      <TouchableOpacity
+                        key={bank}
+                        style={[
+                          styles.bankOption,
+                          secondarySelectedBank === bank && styles.selectedBankOption
+                        ]}
+                        onPress={() => setSecondarySelectedBank(bank)}
+                      >
+                        <Text style={styles.bankOptionText}>{bank}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  const deleteSale = async (saleId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await axios.post(
+        API_URL,
+        { sale_id: saleId },
+        {
+          params: { action: 'delete_sale' },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        Alert.alert('Success', 'Sale deleted successfully');
+        // Refresh daily sales after deletion
+        fetchDailySales();
+      } else {
+        Alert.alert('Error', response.data.message || 'Failed to delete sale');
+      }
+    } catch (error) {
+      console.error('Delete sale error:', error);
+      const errorMessage = error.response?.data?.message || 'An error occurred while deleting the sale.';
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  const confirmDelete = (saleId) => {
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this sale?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', onPress: () => deleteSale(saleId) }
+      ]
     );
   };
 
-  // Function to render summary cards
-  const renderSummaryCard = (title, value, color = '#2d3436') => (
-    <Card containerStyle={styles.summaryCard}>
-      <Text style={styles.summaryTitle}>{title}</Text>
-      <Text style={[styles.summaryValue, { color }]}>{formatCurrency(value)}</Text>
-    </Card>
-  );
-
-  // Function to render bank balance rows
-  const renderBankBalance = (bank, balance) => (
-    <View key={bank} style={styles.bankRow}>
-      <Text style={styles.bankName}>{bank}</Text>
-      <Text style={[
-        styles.bankBalance, 
-        { color: balance >= 0 ? '#00b894' : '#e17055' }
-      ]}>
-        {formatCurrency(balance)}
-      </Text>
-    </View>
-  );
-
-  // Function to render sales transaction items
-  const renderTransactionItem = ({ item }) => (
-    <View style={styles.transactionItem}>
-      <Text style={styles.productName}>{item.product_name}</Text>
-      <View style={styles.transactionDetail}>
-        <Text>{item.quantity} x {formatCurrency(item.unit_price)}</Text>
-        <Text style={styles.itemTotal}>{formatCurrency(item.quantity * item.unit_price)}</Text>
-      </View>
-      <View style={styles.transactionFooter}>
-        <Text style={styles.paymentMethod}>{item.payment_method} - {item.bank_name || 'Cash'}</Text>
-        {item.item_unpaid > 0 && (
-          <Text style={styles.unpaidAmount}>
-            Unpaid: {formatCurrency(item.item_unpaid)}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-
-  // Function to render expense items
-  const renderExpenseItem = ({ item }) => (
-    <View style={styles.expenseItem}>
-      <Text style={styles.expenseReason}>{item.reason}</Text>
-      <View style={styles.expenseDetail}>
-        <Text style={styles.expenseType}>{item.type === 'spending' ? 'Expense' : 'Order'}</Text>
-        <Text style={styles.expenseAmount}>{formatCurrency(item.amount)}</Text>
-      </View>
-      <View style={styles.expenseFooter}>
-        <Text style={styles.paymentMethod}>{item.payment_method} - {item.bank_name || 'Cash'}</Text>
-      </View>
-    </View>
-  );
-
-  // Function to render bank deposit items
-  const renderDepositItem = ({ item }) => (
-    <View style={styles.depositItem}>
-      <Text style={styles.depositBank}>{item.bank_name}</Text>
-      <View style={styles.depositDetail}>
-        <Text>{item.reference_number || 'No Ref'}</Text>
-        <Text style={styles.depositAmount}>{formatCurrency(item.amount)}</Text>
-      </View>
-      <Text style={styles.depositDate}>{new Date(item.deposit_date).toLocaleDateString()}</Text>
-    </View>
-  );
-
-  return ( 
+  return (
     <View style={styles.container}>
-      <Text style={styles.screenTitle}>Financial Analytics Report</Text>
-      
-      {/* Date Range Selector */}
-      <View style={styles.dateContainer}>
-        <TouchableOpacity 
-          style={styles.dateButton}
-          onPress={() => setShowStartPicker(true)}
-        >
-          <Text style={styles.dateText}>From: {startDate.toLocaleDateString()}</Text>
-          <Icon name="calendar" type="font-awesome" size={20} color="#3498db" />
+        <TouchableOpacity style={styles.toggleButton} onPress={() => setShowDailySales(!showDailySales)}>
+          <Text style={styles.toggleButtonText}>{showDailySales ? 'Hide' : 'Show'} Daily Sales</Text>
         </TouchableOpacity>
-        
+
+        {showDailySales && (
+          <View style={styles.dailySalesContainer}>
+            <Text style={styles.sectionTitle}>Today's Sales</Text>
+            <FlatList
+              data={dailySales}
+              keyExtractor={(item) => item.transaction_item_id.toString()}
+              renderItem={({ item }) => (
+                <View style={styles.salesItem}>
+                  <Text style={styles.salesItemText}>{item.product_name}</Text>
+                  <Text style={styles.salesItemText}>Qty: {item.quantity}</Text>
+                  <Text style={styles.salesItemText}>Price: {item.price}</Text>
+                  <Text style={styles.salesItemText}>Total: {item.total_amount}</Text>
+                  <TouchableOpacity 
+                    style={styles.deleteButton}
+                    onPress={() => confirmDelete(item.transaction_item_id)}
+                  >
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              ListEmptyComponent={<Text>No sales recorded for today.</Text>}
+            />
+          </View>
+        )}
+
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search products..."
+          placeholderTextColor="#999"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
         <TouchableOpacity 
-          style={styles.dateButton}
-          onPress={() => setShowEndPicker(true)}
+          style={styles.searchButton}
+          onPress={() => {
+            // Re-fetch products to ensure we have latest data
+            fetchProducts();
+          }}
         >
-          <Text style={styles.dateText}>To: {endDate.toLocaleDateString()}</Text>
-          <Icon name="calendar" type="font-awesome" size={20} color="#3498db" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.refreshButton}
-          onPress={fetchReport}
-        >
-          <Icon name="refresh" size={20} color="#fff" />
+          <Icon name="search" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Date Pickers */}
-      {showStartPicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="date"
-          onChange={handleStartDateChange}
-        />
-      )}
-      
-      {showEndPicker && (
-        <DateTimePicker
-          value={endDate}
-          mode="date"
-          onChange={handleEndDateChange}
-        />
-      )}
-
-      {/* Loading Indicator */}
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3498db" />
-          <Text style={styles.loadingText}>Generating report...</Text>
-        </View>
-      )}
-
-      {/* Error Message */}
-      {error && !loading && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={fetchReport}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryScroll}
+      >
+        {categories.map(category => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.categoryButton,
+              selectedCategory === category && styles.selectedCategoryButton
+            ]}
+            onPress={() => setSelectedCategory(category)}
           >
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={[
+              styles.categoryButtonText,
+              selectedCategory === category && styles.selectedCategoryButtonText
+            ]}>
+              {category}
+            </Text>
           </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Cart Section at Top */}
+        <View style={styles.cartSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Current Sale</Text>
+            <Text style={styles.itemCount}>{cart.length} {cart.length === 1 ? 'item' : 'items'}</Text>
+          </View>
+          
+          {cart.length === 0 ? (
+            <View style={styles.emptyCart}>
+              <Icon name="shopping-cart" size={40} color="#ccc" />
+              <Text style={styles.emptyCartText}>Your cart is empty</Text>
+            </View>
+          ) : (
+            <View style={styles.cartItemsContainer}>
+              <FlatList
+                data={cart}
+                renderItem={renderCartItem}
+                keyExtractor={(item) => item.product_id.toString()}
+                scrollEnabled={false}
+              />
+              <View style={styles.totalContainer}>
+                <Text style={styles.totalLabel}>Total:</Text>
+                <Text style={styles.totalAmount}>ETB {calculateTotal()}</Text>
+              </View>
+            </View>
+          )}
         </View>
-      )}
 
-      {/* Report Content */}
-      {reportData && !loading && !error && (
-        <ScrollView style={styles.reportContainer}>
-          {/* Date Range Info */}
-          <Text style={styles.dateRangeText}>
-            Report Period: {new Date(reportData.start_date).toLocaleDateString()} to {new Date(reportData.end_date).toLocaleDateString()}
-          </Text>
-          
-          {/* Financial Summary */}
-          <Card containerStyle={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Financial Summary</Text>
-            
-            <View style={styles.summaryContainer}>
-              {renderSummaryCard('Total Sales', reportData.summary.total_sales)}
-              {renderSummaryCard('Total Expenses', reportData.summary.total_expenses, '#e74c3c')}
-              {renderSummaryCard('Net Income', 
-                reportData.summary.net_income, 
-                reportData.summary.net_income >= 0 ? '#27ae60' : '#e74c3c'
-              )}
-            </View>
-          </Card>
-          
-          {/* Sales vs Expenses Trend */}
-          {renderLineChart()}
+        {/* Payment Method */}
+        {renderPaymentMethod()}
 
-          {renderPieChart("Sales by Category", reportData.summary.category_sales, ['#00b894', '#00cec9', '#55efc4', '#81ecec', '#74b9ff'])}
-          {renderPieChart("Expenses by Category", reportData.summary.expense_categories, ['#d63031', '#e17055', '#ff7675', '#fab1a0', '#fd79a8'])}
-
-          {/* Cash and Bank Balances */}
-          <Card containerStyle={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Cash & Bank Balances</Text>
-            
-            {/* Cash Balance */}
-            <View style={styles.balanceContainer}>
-              <Text style={styles.balanceLabel}>Cash Balance:</Text>
-              <Text style={[
-                styles.balanceValue,
-                { color: reportData.summary.cash_balance >= 0 ? '#27ae60' : '#e74c3c' }
-              ]}>
-                {formatCurrency(reportData.summary.cash_balance)}
-              </Text>
-            </View>
-            
-            {/* Bank Balances */}
-            <View style={styles.bankBalancesContainer}>
-              <Text style={styles.subSectionTitle}>Bank Balances</Text>
-              {Object.entries(reportData.summary.bank_balances).map(([bank, balance]) => 
-                renderBankBalance(bank, balance)
-              )}
-            </View>
-          </Card>
-          
-          {/* Sales Transactions */}
-          <Card containerStyle={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Sales Transactions</Text>
-              <Text style={styles.countBadge}>{reportData.sales.length} transactions</Text>
-            </View>
+        {/* Products Section */}
+        <View style={styles.productsSection}>
+          <Text style={styles.sectionTitle}>Available Products</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color="#4A90E2" />
+          ) : networkError ? (
+            <Text style={styles.errorText}>Network Error. Please try again.</Text>
+          ) : (
             <FlatList
-              data={reportData.sales}
-              renderItem={renderTransactionItem}
-              keyExtractor={(item, index) => `${item.transaction_id}_${index}`}
+              data={getFilteredProducts()}
+              renderItem={renderProduct}
+              keyExtractor={(item) => item.id.toString()}
+              numColumns={2}
+              columnWrapperStyle={styles.productGrid}
               scrollEnabled={false}
             />
-          </Card>
-          
-          {/* Expenses */}
-          <Card containerStyle={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Expenses</Text>
-              <Text style={styles.countBadge}>{reportData.expenses.length} records</Text>
-            </View>
-            <FlatList
-              data={reportData.expenses}
-              renderItem={renderExpenseItem}
-              keyExtractor={(item) => `${item.type}_${item.id}`}
-              scrollEnabled={false}
-            />
-          </Card>
-          
-          {/* Bank Deposits */}
-          <Card containerStyle={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Bank Deposits</Text>
-              <Text style={styles.countBadge}>{reportData.deposits.length} deposits</Text>
-            </View>
-            <FlatList
-              data={reportData.deposits}
-              renderItem={renderDepositItem}
-              keyExtractor={(item) => `deposit_${item.id}`}
-              scrollEnabled={false}
-            />
-          </Card>
-          
-          <View style={styles.footerSpace} />
-        </ScrollView>
-      )}
-    </View> 
-  ); 
-}; 
+          )}
+        </View>
 
-const styles = StyleSheet.create({ 
+      </ScrollView>
+
+      {/* Fixed Action Buttons at Bottom */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.clearButton]}
+          onPress={() => setCart([])}
+        >
+          <Icon name="delete" size={20} color="#e74c3c" />
+          <Text style={styles.clearButtonText}>Clear</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.checkoutButton, (processing || cart.length === 0) && styles.disabledButton]}
+          onPress={handleCheckout}
+          disabled={processing || cart.length === 0}
+        >
+          {processing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Icon name="shopping-cart" size={20} color="#fff" />
+              <Text style={styles.checkoutButtonText}>Checkout</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContainer: {
     padding: 16,
-    backgroundColor: '#f8f9fa',
-  },
-  screenTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginVertical: 16,
-    textAlign: 'center',
-    color: '#2c3e50',
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 8,
-    elevation: 2,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ecf0f1',
-    borderRadius: 8,
-    padding: 10,
-    flex: 1,
-    marginHorizontal: 5,
-    justifyContent: 'space-between',
-  },
-  dateText: {
-    fontSize: 14,
-    color: '#34495e',
-  },
-  refreshButton: {
-    backgroundColor: '#3498db',
-    borderRadius: 8,
-    padding: 10,
-    marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 50,
-  },
-  dateRangeText: {
-    textAlign: 'center',
-    marginVertical: 10,
-    color: '#7f8c8d',
-    fontSize: 16,
-  },
-  sectionCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#2c3e50',
+    paddingBottom: 100, // Space for fixed footer
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  countBadge: {
-    backgroundColor: '#3498db',
+  itemCount: {
+    backgroundColor: '#4A90E2',
     color: '#fff',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
     fontSize: 14,
   },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  summaryCard: {
+  cartSection: {
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    width: '48%',
-    marginBottom: 12,
-    backgroundColor: '#f8f9fa',
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  summaryTitle: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    marginBottom: 8,
-  },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  chartCard: {
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 12,
-    backgroundColor: '#ffffff',
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  },
-  legendContainer: {
-    marginTop: 15,
-    paddingHorizontal: 10,
-  },
-  legendItem: {
-    flexDirection: 'row',
+  emptyCart: {
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 20,
   },
-  legendColorBox: {
-    width: 16,
-    height: 16,
-    marginRight: 10,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 14,
-    color: '#34495e',
-  },
-  legendValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  balanceContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  balanceLabel: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#34495e',
-  },
-  balanceValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  bankBalancesContainer: {
-    marginTop: 16,
-  },
-  subSectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#34495e',
-  },
-  bankRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  bankName: {
+  emptyCartText: {
+    color: '#999',
+    marginTop: 10,
     fontSize: 16,
-    color: '#2c3e50',
   },
-  bankBalance: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  categoryContainer: {
+  cartItemsContainer: {
     marginTop: 10,
   },
-  categoryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
+  productsSection: {
+    marginBottom: 20,
   },
-  categoryName: {
-    fontSize: 16,
-    color: '#2c3e50',
+  productCard: {
+    flex: 1,
+    margin: 6,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    overflow: 'hidden',
   },
-  categoryAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#27ae60',
-  },
-  transactionItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
+  productContent: {
+    padding: 12,
   },
   productName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    height: 40, // Fixed height for 2 lines
+  },
+  productPrice: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#2c3e50',
-    marginBottom: 6,
-  },
-  transactionDetail: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  itemTotal: {
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#4A90E2',
+    marginBottom: 4,
   },
-  transactionFooter: {
-    flexDirection: 'row',
+  productStock: {
+    fontSize: 13,
+    color: '#666',
+  },
+  productGrid: {
     justifyContent: 'space-between',
   },
-  paymentMethod: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
-  unpaidAmount: {
-    color: '#e74c3c',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  expenseItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  expenseReason: {
-    fontSize: 16,
-    color: '#2c3e50',
-    marginBottom: 6,
-  },
-  expenseDetail: {
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    backgroundColor: '#fff',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    elevation: 5,
   },
-  expenseType: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
-  expenseAmount: {
-    fontWeight: 'bold',
-    color: '#e74c3c',
-  },
-  expenseFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  depositItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  depositBank: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#2c3e50',
-    marginBottom: 6,
-  },
-  depositDetail: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  depositAmount: {
-    fontWeight: 'bold',
-    color: '#3498db',
-  },
-  depositDate: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    textAlign: 'right',
-  },
-  loadingContainer: {
+  actionButton: {
     flex: 1,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 30,
-  },
-  loadingText: {
-    marginTop: 20,
-    fontSize: 16,
-    color: '#7f8c8d',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-  },
-  errorText: {
-    color: '#e74c3c',
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#3498db',
+    padding: 14,
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
+    marginHorizontal: 6,
   },
-  retryText: {
+  clearButton: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+  },
+  clearButtonText: {
+    color: '#e74c3c',
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  checkoutButton: {
+    backgroundColor: '#4A90E2',
+  },
+  checkoutButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+    marginLeft: 8,
+    fontWeight: '600',
   },
-  footerSpace: {
-    height: 50,
+  disabledButton: {
+    opacity: 0.6,
+  },
+  cartItem: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cartItemInfo: {
+    flex: 1,
+  },
+  cartItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  cartItemPrice: {
+    fontSize: 14,
+    color: '#4A90E2',
+    marginTop: 4,
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 10,
+    width: 100,
+  },
+  cartItemControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityButton: {
+    padding: 8,
+  },
+  quantityInput: {
+    width: 40,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  removeButton: {
+    padding: 8,
+    marginLeft: 10,
+  },
+  totalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4A90E2',
+  },
+  addToCartButton: {
+    backgroundColor: '#4A90E2',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  addToCartText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  searchButton: {
+    backgroundColor: '#4A90E2',
+    padding: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryScroll: {
+    paddingTop: 16,
+    paddingBottom: 29,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  categoryButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 100,
+    height: 40,
+  },
+  selectedCategoryButton: {
+    backgroundColor: '#3a7bd5',
+    borderColor: '#3a7bd5',
+    borderWidth: 1,
+  },
+  categoryButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    includeFontPadding: false,
+    textTransform: 'capitalize',
+  },
+  selectedCategoryButtonText: {
+    color: '#fff',
+  },
+  paymentMethodButton: {
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 100,
+    height: 40,
+  },
+  selectedPaymentMethod: {
+    backgroundColor: '#4A90E2',
+  },
+  paymentMethodText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    includeFontPadding: false,
+    textTransform: 'capitalize',
+  },
+  selectedPaymentMethodText: {
+    color: '#fff',
+  },
+  input: {
+    height: 40,
+    fontSize: 16,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  bankScrollContainer: {
+    paddingHorizontal: 15,
+    paddingBottom: 5,
+  },
+  bankOption: {
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 40,
+    minWidth: 90,
+  },
+  selectedBankOption: {
+    backgroundColor: '#4A90E2',
+  },
+  bankOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  selectedBankOptionText: {
+    color: '#fff',
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#777',
+    marginBottom: 8,
+  },
+  // New styles for credit section
+  creditContainer: {
+    backgroundColor: '#f0f7ff',
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 15,
+  },
+  creditTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  paidAmountSection: {
+    backgroundColor: '#e6f2ff',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+  },
+  paidAmountTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4A90E2',
+    marginBottom: 5,
+  },
+  toggleButton: {
+    backgroundColor: '#4A90E2',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 10,
+    alignSelf: 'center',
+    width: '90%',
+    maxWidth: 350,
+  },
+  toggleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dailySalesContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  salesItem: {
+    backgroundColor: '#fff',
+    padding: 10,
+    marginVertical: 5,
+    borderRadius: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  salesItemText: {
+    fontSize: 14,
+    flex: 1,
+    flexWrap: 'wrap',
+    marginRight: 10,
+  },
+  deleteButton: {
+    backgroundColor: '#e74c3c',
+    padding: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
-export default AnalyticsReportScreen;
+export default SalesScreen;

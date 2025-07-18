@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
   const login = async ({ username, password, role }) => { // Destructure parameters here
     console.log('[Auth] Login initiated');
     try {
-      const res = await fetch('http://dankula.x10.mx/auths.php?action=login', {
+      const res = await fetch('/auths.php?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, role }) // Now these variables are correctly defined

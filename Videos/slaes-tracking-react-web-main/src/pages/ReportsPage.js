@@ -216,6 +216,11 @@ const ReportsPage = () => {
               {renderSummaryCard('Total Sales', reportData.summary.total_sales)}
               {renderSummaryCard('Total Expenses', reportData.summary.total_expenses, '#e74c3c')}
               {renderSummaryCard(
+                'Profit', 
+                reportData.summary.total_profit, 
+                reportData.summary.total_profit >= 0 ? '#27ae60' : '#e74c3c'
+              )}
+              {renderSummaryCard(
                 'Net Income', 
                 reportData.summary.net_income, 
                 reportData.summary.net_income >= 0 ? '#27ae60' : '#e74c3c'

@@ -16,7 +16,7 @@ axiosRetry(axios, {
     axiosRetry.isNetworkError(error) || axiosRetry.isRetryableError(error)
 });
 
-const API_URL = 'https://dankula.x10.mx/auth.php';
+const API_URL = '/auth.php';
 
 const BankDepositScreen = () => {
   const { user } = useAuth();

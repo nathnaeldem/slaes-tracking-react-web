@@ -3,6 +3,8 @@ import { useAuth } from '../auth/AuthContext';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const storedToken = localStorage.getItem('authToken');
+  console.log(storedToken);
 
   return (
     <div className="dashboard-container">

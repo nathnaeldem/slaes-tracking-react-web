@@ -18,7 +18,7 @@ export const getReportData = (startDate, endDate) => {
 
 // Add the missing function
 export const getDashboardStats = () => {
-  return api.get('?action=dashboard_stats');
+  return api.get('?action=get_dashboard_stats');
 };
 
 // Keep existing functions
