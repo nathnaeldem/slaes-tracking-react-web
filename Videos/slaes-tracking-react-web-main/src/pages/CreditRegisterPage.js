@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getProducts, getDailySales, checkout, deleteSale } from '../services/salesService';
 import { useAuth } from '../auth/AuthContext';
 import './CreditRegisterPage.css';
+import axios from 'axios';
 
 const CreditRegisterPage = () => {
   const { user } = useAuth();
@@ -104,37 +105,91 @@ const CreditRegisterPage = () => {
       return;
     }
     if (paymentMethod === 'credit' && !customer) {
-        alert('Please enter a customer name for credit sales.');
-        return;
+      alert('Please enter a customer name for credit sales.');
+      return;
     }
 
     setProcessing(true);
-    const checkoutData = {
-      user_id: user.id,
-      organization_id: user.organization_id,
-      cart: cart,
-      comment: comment,
-      payment_method: paymentMethod,
-      customer_name: customer,
-      unpaid_amount: unpaidAmount,
-      total_amount: calculateTotal(),
-    };
-
     try {
-      const response = await checkout(checkoutData);
-      if (response.success) {
+      // Get token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      // Set up headers with token
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      // Prepare sale data
+      const saleData = {
+        cart: JSON.stringify(cart.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price: item.price,
+          discount: item.discount || 0,
+        }))),
+        comment: comment || '',
+        payment_method: 'credit',
+        customer_name: customer,
+        unpaid_amount: parseFloat(unpaidAmount) || 0,
+        action: 'checkout2',
+        user_id: user?.id,
+        organization_id: user?.organization_id
+      };
+
+      console.log('Sending sale data:', saleData);
+
+      // Make the API request
+      const API_URL = 'https://dankula.x10.mx/auth.php';
+      const response = await axios.post(API_URL, saleData, { headers });
+      
+      console.log('API Response:', response.data);
+
+      if (response.data && response.data.success) {
         alert('Checkout successful!');
+        // Reset form
         setCart([]);
         setComment('');
         setCustomer('');
         setUnpaidAmount('');
-        fetchProducts(); // Refresh products
-        fetchDailySales(); // Refresh sales
+        // Refresh data
+        await Promise.all([
+          fetchProducts(),
+          fetchDailySales()
+        ]);
       } else {
-        alert('Checkout failed: ' + response.message);
+        throw new Error(response.data?.message || 'Checkout failed');
       }
-    } catch (err) {
-      alert('An error occurred during checkout.');
+    } catch (error) {
+      console.error('Detailed checkout error:', {
+        error: error,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+      
+      let errorMessage = 'An error occurred during checkout.\n\n';
+      
+      if (error.response) {
+        // Server responded with an error
+        errorMessage += `Status: ${error.response.status}\n`;
+        if (error.response.data?.message) {
+          errorMessage += `Error: ${error.response.data.message}`;
+        } else if (error.response.data) {
+          errorMessage += `Error: ${JSON.stringify(error.response.data)}`;
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage += 'No response from server. Please check your connection.';
+      } else {
+        // Something else caused the error
+        errorMessage += `Error: ${error.message || 'Unknown error occurred'}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -236,9 +291,26 @@ const CreditRegisterPage = () => {
                     <strong>Total: ${calculateTotal()}</strong>
                 </div>
                 <div className="checkout-form">
-                     <input type="text" placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} className="customer-input" />
-                     <textarea placeholder="Comment" value={comment} onChange={e => setComment(e.target.value)}></textarea>
-                    <button onClick={handleCheckout} disabled={processing}>
+                    <h3>Customer Information</h3>
+                    <input 
+                        type="text" 
+                        placeholder="Customer Name" 
+                        value={customer} 
+                        onChange={e => setCustomer(e.target.value)} 
+                        className="customer-input" 
+                    />
+                    <input 
+                        type="number" 
+                        placeholder="Unpaid Amount" 
+                        value={unpaidAmount}
+                        onChange={e => setUnpaidAmount(e.target.value)}
+                        className="unpaid-amount-input"
+                    />
+                    <button 
+                        onClick={handleCheckout} 
+                        disabled={processing || cart.length === 0}
+                        className="checkout-button"
+                    >
                         {processing ? 'Processing...' : 'Checkout'}
                     </button>
                 </div>
