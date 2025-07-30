@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GreenSecure | Business Management Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --primary-dark: #1b5e20;
+            --primary-light: #4caf50;
+            --primary-lightest: #e8f5e9;
+            --accent: #8bc34a;
+            --light: #f5fbf6;
+            --dark: #1a1a1a;
+            --text: #333;
+            --success: #388e3c;
+            --error: #d32f2f;
+            --admin-color: #2e7d32;
+            --user-color: #1976d2;
+            --worker-color: #f57c00;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+            width: 100%;
+            max-width: 450px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .login-header {
+            background: linear-gradient(120deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            text-align: center;
+            padding: 35px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .login-header::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+        }
+        
+        .login-header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .login-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo i {
+            color: var(--primary);
+            font-size: 2.5rem;
+        }
+        
+        .login-form {
+            padding: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .input-with-icon {
+            position: relative;
+        }
+        
+        .input-with-icon i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 14px 14px 14px 45px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background-color: var(--primary-lightest);
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.2);
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #aaa;
+        }
+        
+        .password-toggle:hover {
+            color: var(--primary);
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .btn:hover::after {
+            opacity: 1;
+        }
+        
+        .forgot-password {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .forgot-password:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+        
+        .role-indicator {
+            display: flex;
+            justify-content: center;
+            margin: 25px 0 15px;
+            gap: 15px;
+        }
+        
+        .role-badge {
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background-color: #f0f0f0;
+            color: #666;
+        }
+        
+        .role-badge.active {
+            background-color: var(--primary-lightest);
+            color: var(--primary);
+        }
+        
+        .welcome-message {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .welcome-message h2 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        
+        .welcome-message p {
+            color: var(--text);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .role-card {
+            background-color: var(--primary-lightest);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .role-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+            font-size: 1.5rem;
+        }
+        
+        .role-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .logout-btn {
+            background-color: var(--light);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            margin-top: 15px;
+        }
+        
+        .logout-btn:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .message {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        
+        .success {
+            background-color: rgba(56, 142, 60, 0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        
+        .error {
+            background-color: rgba(211, 47, 47, 0.15);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 480px) {
+            .login-container {
+                border-radius: 10px;
+            }
+            
+            .login-header {
+                padding: 25px 15px;
+            }
+            
+            .login-form {
+                padding: 25px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h1>GreenSecure Portal</h1>
+            <p>Secure Business Management System</p>
+        </div>
+        
+        <div class="login-form">
+            <div id="loginMessage" class="message"></div>
+            
+            <div class="role-indicator">
+                <div class="role-badge" id="adminBadge">Admin</div>
+                <div class="role-badge" id="userBadge">User</div>
+                <div class="role-badge" id="workerBadge">Worker</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="username">Username</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="username" class="form-control" placeholder="Enter your username" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-key"></i>
+                    <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
+                    <span class="password-toggle" id="togglePassword">
+                        <i class="fas fa-eye"></i>
+                    </span>
+                </div>
+            </div>
+            
+            <button id="loginBtn" class="btn">
+                <span id="loginText">Login to Your Account</span>
+                <span id="loginSpinner" class="loading" style="display: none;"></span>
+            </button>
+            
+            <a href="#" class="forgot-password">Forgot Password?</a>
+        </div>
+        
+        <div class="welcome-message" id="welcomeSection">
+            <div class="role-card">
+                <div class="role-icon" id="roleIcon">
+                    <i class="fas fa-user-cog"></i>
+                </div>
+                <div class="role-title" id="roleTitle">Administrator</div>
+                <div id="roleDescription">You have full access to all system features</div>
+            </div>
+            
+            <h2 id="welcomeTitle">Welcome, Administrator!</h2>
+            <p id="welcomeText">You have successfully logged in to the GreenSecure Business Management System. You can now access all administrative features.</p>
+            <button id="logoutBtn" class="btn logout-btn">Logout</button>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>&copy; 2023 GreenSecure Management System. All rights reserved. | <a href="#">Privacy Policy</a></p>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Password visibility toggle
+            const togglePassword = document.getElementById('togglePassword');
+            const password = document.getElementById('password');
+            
+            togglePassword.addEventListener('click', function() {
+                const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                password.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+            });
+            
+            // Login button handler
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.addEventListener('click', login);
+            
+            // Logout button handler
+            const logoutBtn = document.getElementById('logoutBtn');
+            logoutBtn.addEventListener('click', logout);
+            
+            // Enter key to submit
+            password.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
+            
+            // Check if user is already logged in
+            checkSession();
+            
+            function showMessage(message, isError = false) {
+                const msgElement = document.getElementById('loginMessage');
+                msgElement.textContent = message;
+                msgElement.className = isError ? 'message error' : 'message success';
+                msgElement.style.display = 'block';
+                
+                setTimeout(() => {
+                    msgElement.style.display = 'none';
+                }, 5000);
+            }
+            
+            function showLoading(show) {
+                document.getElementById('loginText').style.display = show ? 'none' : 'inline';
+                document.getElementById('loginSpinner').style.display = show ? 'inline-block' : 'none';
+                loginBtn.disabled = show;
+            }
+            
+            function login() {
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                if (!username || !password) {
+                    showMessage('Please enter both username and password', true);
+                    return;
+                }
+                
+                showLoading(true);
+                
+                // API call to authenticate
+                fetch('auth.php?action=login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw err; });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.message === 'Login successful') {
+                        // Store token and user data in sessionStorage
+                        sessionStorage.setItem('authToken', data.token);
+                        sessionStorage.setItem('userData', JSON.stringify(data.user));
+                        
+                        // Show welcome message based on role
+                        showWelcomeMessage(data.user.role);
+                    } else {
+                        showMessage(data.message || 'Login failed', true);
+                    }
+                })
+                .catch(error => {
+                    showMessage(error.message || 'Login failed. Please try again.', true);
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+            }
+            
+            function showWelcomeMessage(role) {
+                const welcomeSection = document.getElementById('welcomeSection');
+                const loginForm = document.querySelector('.login-form');
+                const roleIcon = document.getElementById('roleIcon');
+                const roleTitle = document.getElementById('roleTitle');
+                const roleDescription = document.getElementById('roleDescription');
+                const welcomeTitle = document.getElementById('welcomeTitle');
+                const welcomeText = document.getElementById('welcomeText');
+                
+                // Reset role badges
+                document.querySelectorAll('.role-badge').forEach(badge => {
+                    badge.classList.remove('active');
+                });
+                
+                // Set UI based on role
+                switch(role) {
+                    case 'admin':
+                        // Set admin UI
+                        roleIcon.innerHTML = '<i class="fas fa-user-cog"></i>';
+                        roleIcon.style.backgroundColor = 'rgba(46, 125, 50, 0.2)';
+                        roleIcon.style.color = 'var(--admin-color)';
+                        roleTitle.textContent = 'Administrator';
+                        roleDescription.textContent = 'Full system access and control';
+                        welcomeTitle.textContent = 'Welcome, Administrator!';
+                        welcomeText.textContent = 'You now have full access to the GreenSecure Management System. Manage products, users, view comprehensive reports, and configure system settings.';
+                        document.getElementById('adminBadge').classList.add('active');
+                        break;
+                    case 'user':
+                        // Set user UI
+                        roleIcon.innerHTML = '<i class="fas fa-user-tie"></i>';
+                        roleIcon.style.backgroundColor = 'rgba(25, 118, 210, 0.2)';
+                        roleIcon.style.color = 'var(--user-color)';
+                        roleTitle.textContent = 'Business User';
+                        roleDescription.textContent = 'Access to business operations';
+                        welcomeTitle.textContent = 'Welcome, Valued User!';
+                        welcomeText.textContent = 'You can now access your business dashboard. View products, manage inventory, track sales, and generate reports for your organization.';
+                        document.getElementById('userBadge').classList.add('active');
+                        break;
+                    case 'worker':
+                        // Set worker UI
+                        roleIcon.innerHTML = '<i class="fas fa-user-hard-hat"></i>';
+                        roleIcon.style.backgroundColor = 'rgba(245, 124, 0, 0.2)';
+                        roleIcon.style.color = 'var(--worker-color)';
+                        roleTitle.textContent = 'Team Worker';
+                        roleDescription.textContent = 'Operational access and task management';
+                        welcomeTitle.textContent = 'Welcome, Team Member!';
+                        welcomeText.textContent = 'Access your work dashboard to manage car wash transactions, track your commissions, update vehicle information, and view your work schedule.';
+                        document.getElementById('workerBadge').classList.add('active');
+                        break;
+                    default:
+                        roleIcon.innerHTML = '<i class="fas fa-user"></i>';
+                        roleIcon.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+                        roleIcon.style.color = 'var(--text)';
+                        roleTitle.textContent = 'User';
+                        roleDescription.textContent = 'System access';
+                        welcomeTitle.textContent = 'Welcome!';
+                        welcomeText.textContent = 'You have successfully logged in to the GreenSecure Management System.';
+                }
+                
+                // Hide login form, show welcome section
+                loginForm.style.display = 'none';
+                welcomeSection.style.display = 'block';
+            }
+            
+            function checkSession() {
+                const token = sessionStorage.getItem('authToken');
+                const userData = sessionStorage.getItem('userData');
+                
+                if (token && userData) {
+                    try {
+                        const user = JSON.parse(userData);
+                        showWelcomeMessage(user.role);
+                    } catch (e) {
+                        // Invalid session data
+                        logout();
+                    }
+                }
+            }
+            
+            function logout() {
+                // Clear session data
+                sessionStorage.removeItem('authToken');
+                sessionStorage.removeItem('userData');
+                
+                // Show login form again
+                document.querySelector('.login-form').style.display = 'block';
+                document.getElementById('welcomeSection').style.display = 'none';
+                
+                // Clear form fields
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+                
+                // Reset password visibility
+                password.setAttribute('type', 'password');
+                togglePassword.innerHTML = '<i class="fas fa-eye"></i>';
+            }
+        });
+    </script>
+</body>
+</html>

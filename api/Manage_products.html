@@ -1,0 +1,166 @@
+<?php
+// manage_products.php
+// 1) Ensure user is authenticated; redirect if not
+session_start();
+if (empty($_SESSION['authToken'])) {
+    header('Location: dashboard.html');
+    exit;
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Products</title>
+  <style>
+    /* Simple styling */
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; }
+    form { margin-bottom: 2em; }
+    label { display: block; margin: 0.5em 0 0.2em; }
+    input, select { width: 100%; padding: 0.4em; }
+    button { margin-top: 1em; padding: 0.6em 1.2em; }
+  </style>
+</head>
+<body>
+  <h1>Product Management</h1>
+
+  <form id="productForm">
+    <input type="hidden" name="product_id" id="product_id">
+    <label>Name: <input type="text" name="name" id="name" required></label>
+    <label>Description: <input type="text" name="description" id="description"></label>
+    <label>Category: <input type="text" name="category" id="category" required></label>
+    <label>Import Price: <input type="number" name="import_price" id="import_price" step="0.01" required></label>
+    <label>Selling Price: <input type="number" name="selling_price" id="selling_price" step="0.01" required></label>
+    <label>Quantity: <input type="number" name="quantity" id="quantity" required></label>
+    <label>Status:
+      <select name="status" id="status">
+        <option value="ordered">Ordered</option>
+        <option value="in_store">In Store</option>
+        <option value="sold">Sold</option>
+      </select>
+    </label>
+    <button type="submit">Save Product</button>
+    <button type="button" id="cancelEdit" style="display:none;">Cancel Edit</button>
+  </form>
+
+  <table id="productsTable">
+    <thead>
+      <tr>
+        <th>Name</th><th>Category</th><th>Import</th><th>Selling</th><th>Qty</th><th>Status</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const apiUrl = 'auth.php';
+    const token = sessionStorage.getItem('authToken');
+
+    // Populate table on load
+    async function loadProducts() {
+  const resp = await fetch(`${apiUrl}?action=getProducts`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+
+  if (resp.status === 401) {
+    alert('Session expired or unauthorized. Please log in again.');
+    window.location.href = 'index.html';
+    return;
+  }
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert('Error loading products: ' + (err.message||resp.statusText));
+    return;
+  }
+
+  const { products = [] } = await resp.json();
+  const tbody = document.querySelector('#productsTable tbody');
+  tbody.innerHTML = '';
+  products.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${p.category}</td>
+          <td>${p.import_price}</td>
+          <td>${p.selling_price}</td>
+          <td>${p.quantity}</td>
+          <td>${p.status}</td>
+          <td>
+            <button data-id="${p.id}">Edit</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Handle form submit
+    document.getElementById('productForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        name: form.name.value,
+        description: form.description.value,
+        category: form.category.value,
+        import_price: form.import_price.value,
+        selling_price: form.selling_price.value,
+        quantity: form.quantity.value,
+        status: form.status.value
+      };
+      let action;
+      if (form.product_id.value) {
+        action = 'updateProduct';
+        data.product_id = form.product_id.value;
+      } else {
+        action = 'addProduct';
+      }
+      const resp = await fetch(`${apiUrl}?action=${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify(data)
+      });
+      const json = await resp.json();
+      if (resp.ok) {
+        alert(json.message);
+        form.reset();
+        form.product_id.value = '';
+        document.getElementById('cancelEdit').style.display = 'none';
+        loadProducts();
+      } else {
+        alert('Error: ' + json.message);
+      }
+    });
+
+    // Edit button handler
+    document.querySelector('#productsTable tbody').addEventListener('click', e => {
+      if (!e.target.matches('button[data-id]')) return;
+      const id = e.target.dataset.id;
+      fetch(`${apiUrl}?action=getProductDetails&productId=${id}`, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+      .then(r => r.json())
+      .then(({ product }) => {
+        document.getElementById('product_id').value = product.id;
+        document.getElementById('name').value = product.name;
+        document.getElementById('description').value = product.description;
+        document.getElementById('category').value = product.category;
+        document.getElementById('import_price').value = product.import_price;
+        document.getElementById('selling_price').value = product.selling_price;
+        document.getElementById('quantity').value = product.quantity;
+        document.getElementById('status').value = product.status;
+        document.getElementById('cancelEdit').style.display = 'inline';
+      });
+    });
+
+    document.getElementById('cancelEdit').addEventListener('click', () => {
+      document.getElementById('productForm').reset();
+      document.getElementById('product_id').value = '';
+      document.getElementById('cancelEdit').style.display = 'none';
+    });
+
+    loadProducts();
+  </script>
+</body>
+</html>

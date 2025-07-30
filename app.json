@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Betse Central",
+    "slug": "betse-centralianias",
+    "version": "1.0.4",
+    "scheme": "betsecentralianias",
+    "orientation": "portrait",
+    "icon": "./logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mrx.betsecentralianias"
+    },
+    "android": {
+      "package": "com.mrx.betsecentralianias",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": []
+    },
+    "web": {
+      "favicon": "./logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fc4d3a1e-2778-4fa4-9e4a-d715b6fa92da"
+      }
+    }
+  }
+}
