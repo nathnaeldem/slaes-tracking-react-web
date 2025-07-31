@@ -505,20 +505,20 @@ case 'getAnalyticsAndReports':
 
         $salesData = $processedSales;
 
-        // 3) Fetch expenses
+        // 3) Fetch expenses (only spendings, no product_orders)
         $expenseStmt = $pdo->prepare("
-            (SELECT 'spending' AS type, id, amount, category, reason,
-                    transaction_date AS date, payment_method, bank_name
-               FROM spendings
-              WHERE organization_id = :org_id
-                AND DATE(transaction_date) BETWEEN :start_date AND :end_date)
-            UNION ALL
-            (SELECT 'order' AS type, id, paid_amount AS amount,
-                    'product_order' AS category, product_name AS reason,
-                    created_at AS date, payment_method, bank_name
-               FROM product_orders
-              WHERE organization_id = :org_id
-                AND DATE(created_at) BETWEEN :start_date AND :end_date)
+            SELECT
+                'spending' AS type,
+                id,
+                amount,
+                category,
+                reason,
+                transaction_date AS date,
+                payment_method,
+                bank_name
+            FROM spendings
+            WHERE organization_id = :org_id
+              AND DATE(transaction_date) BETWEEN :start_date AND :end_date
             ORDER BY date DESC
         ");
         $expenseStmt->execute([
@@ -570,8 +570,8 @@ case 'getAnalyticsAndReports':
             'cash_balance'          => 0,
             'category_sales'        => [],
             'category_profit'       => [],
-            'cash_balance_details'  => [], // NEW: For details
-            'bank_balance_details'  => [], // NEW: For details
+            'cash_balance_details'  => [],
+            'bank_balance_details'  => [],
             'partial_payments'      => [
                 'total_cash' => 0,
                 'total_bank' => 0
@@ -580,38 +580,38 @@ case 'getAnalyticsAndReports':
         $banks = ['CBE','Awash','Dashen','Abyssinia','Birhan','Telebirr'];
         foreach ($banks as $b) {
             $summary['bank_balances'][$b] = 0;
-            $summary['bank_balance_details'][$b] = []; // NEW: Initialize detail array for each bank
+            $summary['bank_balance_details'][$b] = [];
         }
 
-        // 7) Build sales & balances, including credit paid portion
+        // 7) Build sales & balances (full item_total)
         foreach ($salesData as $sale) {
-            $paidAmount = $sale['item_paid'];
-            $profit     = $sale['item_profit'];
-            $cat        = $sale['category'] ?: 'Uncategorized';
-            $pmethod    = strtolower(trim($sale['payment_method']));
-            $bname      = $sale['bank_name'];
+            $fullAmount  = (float)$sale['item_total'];
+            $profit      = (float)$sale['item_profit'];
+            $cat         = $sale['category'] ?: 'Uncategorized';
+            $pmethod     = strtolower(trim($sale['payment_method']));
+            $bname       = $sale['bank_name'];
             $productName = $sale['product_name'];
 
-            $summary['total_sales']  += $paidAmount;
-            $summary['total_profit'] += $profit;
-            $summary['category_sales'][$cat]  = ($summary['category_sales'][$cat]  ?? 0) + $paidAmount;
-            $summary['category_profit'][$cat] = ($summary['category_profit'][$cat] ?? 0) + $profit;
+            $summary['total_sales']            += $fullAmount;
+            $summary['category_sales'][$cat]   = ($summary['category_sales'][$cat]  ?? 0) + $fullAmount;
+            $summary['total_profit']           += $profit;
+            $summary['category_profit'][$cat]  = ($summary['category_profit'][$cat] ?? 0) + $profit;
 
             $sale_desc = "Sale: " . $productName;
 
             if ($pmethod === 'cash') {
-                $summary['cash_balance'] += $paidAmount;
-                if ($paidAmount > 0) $summary['cash_balance_details'][] = "(+) " . number_format($paidAmount, 2) . " - " . $sale_desc;
+                $summary['cash_balance'] += $fullAmount;
+                $summary['cash_balance_details'][] = "(+) " . number_format($fullAmount, 2) . " - " . $sale_desc;
             }
             elseif ($pmethod === 'bank' && isset($summary['bank_balances'][$bname])) {
-                $summary['bank_balances'][$bname] += $paidAmount;
-                if ($paidAmount > 0) $summary['bank_balance_details'][$bname][] = "(+) " . number_format($paidAmount, 2) . " - " . $sale_desc;
+                $summary['bank_balances'][$bname] += $fullAmount;
+                $summary['bank_balance_details'][$bname][] = "(+) " . number_format($fullAmount, 2) . " - " . $sale_desc;
             }
             elseif ($pmethod === 'partial') {
-                $cash_part = $sale['item_cash'];
-                $bank_part = $sale['item_bank'];
-                $summary['cash_balance'] += $cash_part;
-                $summary['bank_balances'][$bname] += $bank_part;
+                $cash_part = $sale['item_cash'] ?? 0;
+                $bank_part = $sale['item_bank'] ?? 0;
+                $summary['cash_balance']                  += $cash_part;
+                $summary['bank_balances'][$bname]         += $bank_part;
                 $summary['partial_payments']['total_cash'] += $cash_part;
                 $summary['partial_payments']['total_bank'] += $bank_part;
                 if ($cash_part > 0) $summary['cash_balance_details'][] = "(+) " . number_format($cash_part, 2) . " - " . $sale_desc . " (Partial)";
@@ -631,13 +631,13 @@ case 'getAnalyticsAndReports':
             }
         }
 
-        // 8) Account for payment records (credit payments)
+        // 8) Account for payment records
         foreach ($paymentRecords as $payment) {
             $pmethod = strtolower($payment['payment_method']);
             $bname   = $payment['bank_name'];
             $amount  = (float)$payment['payment_amount'];
-            $desc = "Payment from " . ($payment['customer_name'] ?: 'N/A');
-            
+            $desc    = "Payment from " . ($payment['customer_name'] ?: 'N/A');
+
             if ($pmethod === 'cash') {
                 $summary['cash_balance'] += $amount;
                 $summary['cash_balance_details'][] = "(+) " . number_format($amount, 2) . " - " . $desc;
@@ -645,14 +645,13 @@ case 'getAnalyticsAndReports':
                 $summary['bank_balances'][$bname] += $amount;
                 $summary['bank_balance_details'][$bname][] = "(+) " . number_format($amount, 2) . " - " . $desc;
             }
-            
             $summary['total_sales'] += $amount;
         }
 
-        // 9) Subtract expenses
+        // 9) Subtract expenses (only spendings)
         foreach ($expensesData as $exp) {
-            $amt = (float)$exp['amount'];
-            $desc = "Expense: " . ($exp['reason'] ?: $exp['type']);
+            $amt  = (float)$exp['amount'];
+            $desc = "Expense: " . ($exp['reason'] ?: 'spending');
             $summary['total_expenses'] += $amt;
             if ($exp['payment_method'] === 'bank' && isset($summary['bank_balances'][$exp['bank_name']])) {
                 $summary['bank_balances'][$exp['bank_name']] -= $amt;
@@ -675,9 +674,11 @@ case 'getAnalyticsAndReports':
             }
         }
 
-        $summary['net_income'] = $summary['total_profit'] - $summary['total_expenses'];
+        // 11) Compute net income as cash + sum of all bank balances
+        $summary['net_income'] = $summary['cash_balance']
+            + array_sum($summary['bank_balances']);
 
-        // 11) Return
+        // 12) Return everything
         http_response_code(200);
         echo json_encode([
             'success'         => true,
@@ -698,6 +699,7 @@ case 'getAnalyticsAndReports':
         ]);
     }
     break;
+
 
 case 'get_dashboard_stats':
     try {
